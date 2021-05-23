@@ -1,5 +1,6 @@
 #!/usr/env/python
 
+import time
 import xlrd 
 from bs4 import BeautifulSoup
 import requests
@@ -76,7 +77,7 @@ def init(filename,col):
         url = str.strip(str(sheet.cell_value(i, int(col))))
         if(url !=""):
             allowed_domains.add(url)
-    for url in list(allowed_domains)[:multiprocessing.cpu_count()]:
+    for url in list(allowed_domains)[: 2 * multiprocessing.cpu_count()]:
         urlQueue.push(url)
 
 
@@ -84,41 +85,45 @@ def init(filename,col):
 
 def parse_url():
     globals
-    while(urlQueue.size()>0):
-        url = urlQueue.pop()
-        if url == None:
-            continue
-        if("http" not in url):
-            url = "http://"+ url 
-        print(threading.current_thread().name+ " | " +"### "+ url +" ###")
-        try:
-            r = requests.get(url)
-            
-            soup = BeautifulSoup(r.content, 'html5lib')
-            for link in soup.findAll('a'):
-                link = link.get('href')
-                if link == None:
-                    continue
-                if (".pdf"  in link or ".doc"  in link or ".jpg"  in link or  ".png"  in link  or ".jpeg"  in link or ".ppt"   in link or ".csv"  in link or ".xls"  in link or ".txt"  in link):
-                    continue
-                if (".PDF"  in link or ".DOC"  in link or ".JPG"  in link or  ".PNG"  in link  or ".JPEG"  in link or ".PPT"   in link or ".CSV"  in link or ".XLS"  in link or ".TXT"  in link):
-                    continue
-                if (url in link):
-                    urlQueue.push(link)
-                elif ("www" not in link and "http://" not in link and "https" not in link):
-                    urlQueue.push(urlparse(url).scheme+"://"+urlparse(url).hostname+'/'+link)
+    for retry in range(3):
+        while(urlQueue.size()>0):
+            url = urlQueue.pop()
+            if url == None:
+                continue
+            if("http" not in url):
+                url = "http://"+ url 
+            print(threading.current_thread().name+ " | " +"### "+ url +" ###")
+            try:
+                r = requests.get(url)
+                
+                soup = BeautifulSoup(r.content, 'html5lib')
+                for link in soup.findAll('a'):
+                    link = link.get('href')
+                    if link == None:
+                        continue
+                    if (".pdf"  in link or ".doc"  in link or ".jpg"  in link or  ".png"  in link  or ".jpeg"  in link or ".ppt"   in link or ".csv"  in link or ".xls"  in link or ".txt"  in link):
+                        continue
+                    if (".PDF"  in link or ".DOC"  in link or ".JPG"  in link or  ".PNG"  in link  or ".JPEG"  in link or ".PPT"   in link or ".CSV"  in link or ".XLS"  in link or ".TXT"  in link):
+                        continue
+                    if (url in link):
+                        urlQueue.push(link)
+                    elif ("www" not in link and "http://" not in link and "https" not in link):
+                        urlQueue.push(urlparse(url).scheme+"://"+urlparse(url).hostname+'/'+link)
 
 
-            text = r.text  
-            emails = set(re.findall(r"[a-z0-9\.\-+_]+@[a-z0-9\.\-+_]+\.[a-z]+", text))
-            print(emails)
-            results.add(url,",".join(emails))
-            with open("results.csv","a+") as f:
-                f.write(url+","+",".join(emails)+'\n')
-                f.close()
-            
-        except Exception as error:
-            print(error)
+                text = r.text  
+                emails = set(re.findall(r"[a-z0-9\.\-+_]+@[a-z0-9\.\-+_]+\.[a-z]+", text))
+                print(emails)
+                if(len(emails) > 0):
+                    results.add(urlparse(url).scheme+"://"+urlparse(url).hostname,",".join(emails))
+
+                    with open("results.csv","a+") as f:
+                        f.write(url+","+",".join(emails)+'\n')
+                        f.close()
+                
+            except Exception as error:
+                print(error)
+            time.sleep(2)
 
 if __name__ == "__main__":
     if(len(sys.argv)!=3):
@@ -130,16 +135,24 @@ if __name__ == "__main__":
     t_count = 0
     q_size = urlQueue.size()
 
-    while(q_size>0 and t_count<multiprocessing.cpu_count()):
-        t1 = threading.Thread(target=parse_url, args=(),name="# "+ str(t_count))
-        t1.start()
+    threads = list()
+
+    while(q_size>0 and t_count< 2 * multiprocessing.cpu_count()):
+        threads.append(threading.Thread(target=parse_url, args=(),name="# "+ str(t_count)))
+        threads[t_count].start()
         t_count = t_count+1
     t_count=0
-    while(q_size>0 and t_count<multiprocessing.cpu_count()):
-        t1.join()
+    while(q_size>0 and t_count< 2* multiprocessing.cpu_count()):
+        threads[t_count].join()
         t_count = t_count+1
+        
     parse_url()
     print(results.get())
+    with open("results_f.csv","w+") as f:
+        final_results = results.get()
+        for key in final_results :
+            f.write(key+','+final_results[key]+'/n')
+        f.close()
     print("Done!")
     exit(0)
 
