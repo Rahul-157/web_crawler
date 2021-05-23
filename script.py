@@ -65,10 +65,6 @@ class Results:
         return self.results
     
 
-            
-        
-
-
 def init(filename,col): 
     allowed_domains = set() 
     wb = xlrd.open_workbook(filename)
@@ -79,9 +75,6 @@ def init(filename,col):
             allowed_domains.add(url)
     for url in list(allowed_domains):
         urlQueue.push(url)
-
-
-
 
 def parse_url():
     globals
