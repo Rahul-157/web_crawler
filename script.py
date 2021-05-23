@@ -77,7 +77,7 @@ def init(filename,col):
         url = str.strip(str(sheet.cell_value(i, int(col))))
         if(url !=""):
             allowed_domains.add(url)
-    for url in list(allowed_domains)[: 2 * multiprocessing.cpu_count()]:
+    for url in list(allowed_domains):
         urlQueue.push(url)
 
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     with open("results_f.csv","w+") as f:
         final_results = results.get()
         for key in final_results :
-            f.write(key+','+final_results[key]+'/n')
+            f.write(key+','+",".join(final_results[key])+'/n')
         f.close()
     print("Done!")
     exit(0)
